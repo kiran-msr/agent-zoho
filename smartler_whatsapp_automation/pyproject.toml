@@ -1,0 +1,17 @@
+[project]
+name = "smartler-level0-automation"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "marimo>=0.14.17",
+    "praisonaiagents>=0.0.161",
+    "fastapi>=0.110.0",
+    "uvicorn>=0.27.1",
+    "requests>=2.31.0",
+    "python-dotenv>=1.0.0",
+    "outlines>=1.2.3",
+    "google-genai>=1.30.0",
+    "mcp>=1.13.0",
+]
