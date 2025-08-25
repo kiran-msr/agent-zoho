@@ -10,6 +10,7 @@ from outlines_llm import get_outlines_llm
 from zoho_client_secure import create_ticket, find_contact_by_field
 import os
 from dotenv import load_dotenv
+from config import get_list_from_env
 
 load_dotenv()
 
@@ -18,7 +19,9 @@ CONTACT_ID = os.environ.get("ZOHO_CONTACT_ID")
 TEST_PHONE_NUMBER = "1 888 900 9646"
 WHATSAPP_PHONE_NUMBER = "Test group"
 
-numbers = ["Troubleshooting  Group"]
+#numbers = ["ITC Maurya - MSR Support"]
+#numbers = ["120363402296086186@g.us","120363419133063958@g.us"]
+numbers = get_list_from_env("WHATSAPP_GROUP_IDS")
 
 whatsapp_agent = get_whatsapp_agent()
 outlines_llm = get_outlines_llm()

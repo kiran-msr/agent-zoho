@@ -90,11 +90,11 @@ def get_access_token():
     Returns:
         str: A valid access token.
     """
-  #  global access_token, token_expires_at
-  #  if not access_token or time.time() >= token_expires_at:
-  #      refresh_access_token()
-  #  return access_token 
-    return ZOHO_ACCESS_TOKEN
+    global access_token, token_expires_at
+    if not access_token or time.time() >= token_expires_at:
+        refresh_access_token()
+    return access_token 
+  #  return ZOHO_ACCESS_TOKEN
 
 def get_headers():
     """Gets the headers for an API request.
