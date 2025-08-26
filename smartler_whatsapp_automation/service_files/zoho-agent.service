@@ -1,0 +1,16 @@
+[Unit]
+Description=Zoho agent Service
+After=network.target
+
+[Service]
+ExecStart=/root/.local/bin/uv run uvicorn main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=5
+User=root
+StandardOutput=append:/var/log/zoho-agent-service.log
+StandardError=append:/var/log/zoho-agent-service.log
+WorkingDirectory=/usr/local/smartler_whatsapp_automation
+Environment="GEMINI_API_KEY="___""
+[Install]
+WantedBy=multi-user.target
+

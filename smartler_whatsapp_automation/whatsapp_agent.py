@@ -21,8 +21,8 @@ class WhatsappChatList(BaseModel):
     chats: List[WhatsappChat]
 
 
-last_timestamp = read_timestamp() 
-last_timestamp += timedelta(seconds=1)
+#last_timestamp = read_timestamp() 
+#last_timestamp += timedelta(seconds=1)
 
 def get_whatsapp_agent():
     """Gets the WhatsApp agent.
@@ -62,6 +62,8 @@ def join_phone_numbers(phone_numbers: list[str]) -> str:
     return ", ".join(phone_numbers) if phone_numbers else ""
 
 def filter_recent_chats(chat_list: WhatsappChatList, seconds: int = 30) -> WhatsappChatList:
+    last_timestamp = read_timestamp() 
+    last_timestamp += timedelta(seconds=1)
     """Filter chats based on timestamp freshness"""
     #print("chat_list print ",chat_list.chats)
     now = datetime.now()
@@ -73,7 +75,28 @@ def filter_recent_chats(chat_list: WhatsappChatList, seconds: int = 30) -> Whats
             retList.append(group_chat)
     return retList
 
+def filter_chats_after_timestamp(chats: List[WhatsappChat], input_dt: datetime) -> WhatsappChatList:
+    """Filter chats that have a timestamp later than the given input datetime.
+       If a timestamp can't be parsed, skip that chat."""
+    filtered = []
+
+    for chat in chats.chats :
+        try:
+            chat_dt = datetime.strptime(chat.timestamp, "%Y-%m-%d %H:%M:%S")
+            print("chat_dt ",chat_dt," ref time",input_dt)
+            if chat_dt > input_dt:
+                filtered.append(chat)
+        except Exception:
+            print("exception while prasing time")
+            continue  # skip invalid timestamps
+    print("filter list ",filtered)
+    return WhatsappChatList(chats=filtered)
+
+
 def get_most_recent_message(phone_numbers: list[str], whatsapp_agent: Agent, outlines_llm: OpenAI):
+
+    last_timestamp = read_timestamp()
+    last_timestamp += timedelta(seconds=1)
     """Gets the most recent message from a specific phone number.
 
     This function uses the WhatsApp agent to get the most recent message from a
@@ -96,7 +119,7 @@ def get_most_recent_message(phone_numbers: list[str], whatsapp_agent: Agent, out
     #message = outlines_llm(whatsapp_agent.start(f"get the most recent message in group(s) {numbers_string} and return it list of WhatsappChat class capture sender number also. Get the hotel_name from chat group's name"), WhatsappChatList)
     #all_message = outlines_llm(whatsapp_agent.start(f"get the last 10 message in group(s) {numbers_string} and return it list of WhatsappChat class capture sender number and timestamp of format ISO 8601 with timezone offset also. Get the hotel_name from chat group's name"), WhatsappChatList)
     #all_message = outlines_llm(whatsapp_agent.start(f"get the last 10 message in group(s) {numbers_string} and return it list of WhatsappChat class after {last_timestamp}  capture sender number and timestamp also. Get the hotel_name from chat group's name"), WhatsappChatList)
-    all_message = outlines_llm(whatsapp_agent.start(f"get all messages in group(s) {numbers_string} and return it list of WhatsappChat class  after {last_timestamp}.  Capture sender number and timestamp also. Get the hotel_name from chat group's name. If no result found, return blank list.Don't give any example data"), WhatsappChatList)
+    all_message = outlines_llm(whatsapp_agent.start(f"using configured whatsapp mcp tools get all messages in group(s) {numbers_string} and return it list of WhatsappChat class  after {last_timestamp}.  Capture sender number and timestamp also. Get the hotel_name from chat group's name. If no result found, return blank list.Don't give any example data"), WhatsappChatList)
 
 
     print("message all ", all_message)
@@ -106,6 +129,8 @@ def get_most_recent_message(phone_numbers: list[str], whatsapp_agent: Agent, out
         print("message_object print : ",message_object)
         #message_object = filter_recent_chats(message_object, seconds=600)
         #print("message ",message)
+
+        message_object =  filter_chats_after_timestamp(message_object,last_timestamp)
         last_msg_time = None
         for group_chat in message_object.chats :
         #print("group_chat ",group_chat)
@@ -142,4 +167,10 @@ def test():
 
 if __name__ == "__main__":
     test()
+
+
+
+
+
+
 

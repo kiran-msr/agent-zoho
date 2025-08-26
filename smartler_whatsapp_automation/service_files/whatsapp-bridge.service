@@ -1,0 +1,16 @@
+[Unit]
+Description=WhatsApp Bridge Service
+After=network.target
+
+[Service]
+ExecStart=go run main.go
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/whatsapp-bridge.log
+StandardError=append:/var/log/whatsapp-bridge.log
+User=root
+WorkingDirectory=/usr/local/whatsapp-mcp/whatsapp-bridge
+
+[Install]
+WantedBy=multi-user.target
+

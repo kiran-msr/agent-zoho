@@ -11,7 +11,9 @@ from zoho_client_secure import create_ticket, find_contact_by_field
 import os
 from dotenv import load_dotenv
 from config import get_list_from_env
+from datetime import datetime
 
+print("executing task at ",datetime.now())
 load_dotenv()
 
 DEPARTMENT_ID = os.environ.get("ZOHO_DEPARTMENT_ID")
@@ -23,8 +25,8 @@ WHATSAPP_PHONE_NUMBER = "Test group"
 #numbers = ["120363402296086186@g.us","120363419133063958@g.us"]
 numbers = get_list_from_env("WHATSAPP_GROUP_IDS")
 
-whatsapp_agent = get_whatsapp_agent()
-outlines_llm = get_outlines_llm()
+#whatsapp_agent = get_whatsapp_agent()
+#outlines_llm = get_outlines_llm()
 
 
 def create_ticket_from_chat(chat: WhatsappChat, department_id: str) -> dict | None:
@@ -73,6 +75,18 @@ def create_ticket_from_chat(chat: WhatsappChat, department_id: str) -> dict | No
         print(f"Failed to create ticket for {from_phone_number}")
 
     return created_ticket
+
+
+def execute_task():
+    whatsapp_agent = get_whatsapp_agent()
+    outlines_llm = get_outlines_llm()
+
+    chat_list = get_most_recent_message(numbers, whatsapp_agent, outlines_llm)
+
+    # Create tickets for each chat
+    for chat in chat_list.chats:
+        create_ticket_from_chat(chat, DEPARTMENT_ID)
+
 
 
 if __name__ == "__main__":
