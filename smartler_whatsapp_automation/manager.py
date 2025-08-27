@@ -5,7 +5,7 @@ This script is the main entry point of the application. It orchestrates the
 workflow of getting the most recent message(s) from WhatsApp, finding the
 corresponding contact(s) in Zoho Desk, and then creating new tickets in Zoho Desk.
 """
-from whatsapp_agent import get_whatsapp_agent, get_most_recent_message, WhatsappChat
+from whatsapp_agent_2 import get_whatsapp_agent, get_most_recent_message, WhatsappChat
 from outlines_llm import get_outlines_llm
 from zoho_client_secure import create_ticket, find_contact_by_field
 import os
@@ -91,6 +91,8 @@ def execute_task():
 
 if __name__ == "__main__":
     # Get all most recent messages
+    whatsapp_agent = get_whatsapp_agent()
+    outlines_llm = get_outlines_llm()
     chat_list = get_most_recent_message(numbers, whatsapp_agent, outlines_llm)
 
     # Create tickets for each chat

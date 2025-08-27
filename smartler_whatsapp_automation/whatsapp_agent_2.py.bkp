@@ -1,0 +1,173 @@
+from praisonaiagents import Agent, MCP
+from outlines.models.openai import OpenAI
+from pydantic import BaseModel
+from typing import List
+from datetime import datetime, timedelta
+from dateutil import parser
+from timestamp_utils import save_timestamp, read_timestamp
+from config import get_list_from_env
+
+
+# -------------------------------
+# Models
+# -------------------------------
+class WhatsappChat(BaseModel):
+    whatsapp_group_id: str
+    jid: str
+    whatsapp_group_name: str
+    issue: str
+    timestamp: datetime   # Pydantic will auto-parse many formats
+    roomNo: str
+    hotel_name: str
+    last_sender: str
+
+    def normalized(self):
+        """Return a normalized dict with timestamp in '%Y-%m-%d %H:%M:%S'"""
+        return {
+            **self.dict(exclude={"timestamp"}),
+            "timestamp": self.timestamp.strftime("%Y-%m-%d %H:%M:%S")
+        }
+
+
+class WhatsappChatList(BaseModel):
+    chats: List[WhatsappChat]
+
+
+# -------------------------------
+# Agent setup
+# -------------------------------
+def get_whatsapp_agent():
+    """Initialize the WhatsApp agent with MCP server."""
+    whatsapp_agent = Agent(
+        instructions="Whatsapp Agent",
+        llm="gemini/gemini-2.0-flash",
+        tools=MCP(
+            command="/root/.local/bin/uv",
+            args=[
+                "--directory",
+                "/usr/local/agent-zoho/whatsapp-mcp/whatsapp-mcp-server",
+                "run",
+                "main.py"
+            ]
+        )
+    )
+    return whatsapp_agent
+
+
+# -------------------------------
+# Utils
+# -------------------------------
+def join_phone_numbers(phone_numbers: list[str]) -> str:
+    return ", ".join(phone_numbers) if phone_numbers else ""
+
+
+def filter_chats_after_timestamp(chats: WhatsappChatList, input_dt: datetime) -> WhatsappChatList:
+    """Keep only chats with timestamp after given datetime."""
+    filtered = []
+    for chat in chats.chats:
+        try:
+            if chat.timestamp > input_dt:
+                print("chat time ",chat.timestamp," ref time ",input_dt)
+                filtered.append(chat)
+        except Exception as e:
+            print("⚠️ Skipping chat due to timestamp parse error:", e)
+            continue
+    return WhatsappChatList(chats=filtered)
+
+
+# -------------------------------
+# Core function
+# -------------------------------
+def get_most_recent_message(phone_numbers: list[str], whatsapp_agent: Agent, outlines_llm: OpenAI):
+    last_timestamp = read_timestamp() + timedelta(seconds=1)
+    numbers_string = join_phone_numbers(phone_numbers)
+
+    # 1) Call MCP tool explicitly (just fetch raw messages)
+    print(f"📡 Calling MCP server for groups {numbers_string} after {last_timestamp}")
+    raw_response = whatsapp_agent.start(
+        f"get all messages in group(s) {numbers_string} after {last_timestamp} along with group name"
+    )
+    print("✅ MCP server raw response:", raw_response)
+
+    if not raw_response or raw_response.strip() == "":
+        print("⚠️ MCP server returned nothing")
+        return WhatsappChatList(chats=[])
+
+    # 2) Structure with Outlines LLM (now carries extraction instructions)
+    structured_response = outlines_llm(
+        f"""You are a JSON generator.
+Respond ONLY with valid JSON conforming to the schema below.
+Do not include explanations, clarifications, or examples.
+If no messages are found, return {{"chats": []}}.
+
+When extracting, return raw message data including:
+- sender number
+- timestamp in %Y-%m-%d %H:%M:%S format
+- group id
+- group name
+
+Schema:
+class WhatsappChat(BaseModel):
+    whatsapp_group_id: str
+    jid: str
+    whatsapp_group_name: str
+    issue: str
+    timestamp: str
+    roomNo: str
+    hotel_name: str
+    last_sender: str
+
+class WhatsappChatList(BaseModel):
+    chats: List[WhatsappChat]
+
+Raw MCP data:
+{raw_response}
+""",
+        WhatsappChatList
+    )
+
+    print("📥 Structured response:", structured_response)
+
+    # 3) Parse & normalize
+    message_object = WhatsappChatList.model_validate_json(structured_response)
+
+    # Filter out old chats
+    message_object = filter_chats_after_timestamp(message_object, last_timestamp)
+
+    last_msg_time = None
+    for group_chat in message_object.chats :
+    #print("group_chat ",group_chat)
+        currTime = group_chat.timestamp
+        if last_msg_time is None or currTime > last_msg_time : 
+            last_msg_time = currTime
+    if last_msg_time is not None and last_msg_time > last_timestamp :
+        save_timestamp(last_msg_time)
+
+
+    # Save latest timestamp
+    #if message_object.chats:
+    #    last_msg_time = max(chat.timestamp for chat in message_object.chats)
+    #    if last_msg_time > last_timestamp:
+    #        save_timestamp(last_msg_time)
+
+    # Return normalized output
+    #normalized_chats = [WhatsappChat(**chat.normalized()) for chat in message_object.chats]
+    #return WhatsappChatList(chats=normalized_chats)
+    return message_object
+
+# -------------------------------
+# Test runner
+# -------------------------------
+def test():
+    from outlines_llm import get_outlines_llm
+    whatsapp_agent = get_whatsapp_agent()
+    outlines_llm = get_outlines_llm()
+    numbers = get_list_from_env("WHATSAPP_GROUP_IDS")
+    print("numbers ",numbers)
+    message_object = get_most_recent_message(numbers, whatsapp_agent, outlines_llm)
+    print("🎯 Final normalized message object:", message_object)
+
+
+if __name__ == "__main__":
+    test()
+

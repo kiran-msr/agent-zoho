@@ -1,3 +1,38 @@
+# Process to run this serive #
+1. git clone
+2. uv install
+3. go install
+3. create service file for whatsapp-bridge
+4. run the service systemctl start whatsapp-bridge
+5. create service files for zoho-agent
+6. uv sync
+7. google cloud cli login
+
+8. Install Google Cloud CLI - run the following commands in particular location (e.g. /usr/local)
+# curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-492.0.0-linux-x86_64.ta…
+# tar -xf google-cloud-cli-492.0.0-linux-x86_64.tar.gz
+# ./google-cloud-sdk/install.sh
+# exec -l $SHELL
+9. Login in Google Cloud CLI - this is required for calling google cloud related APIs (here from outline_llm.py)
+# gcloud auth application-default login
+
+NOTE: when hit the command gcloud auth application-default login a link will be shown in terminal. copy that link and paste in browser, login with google account and accept all the prompts a code will be generate paste the code in the terminal
+
+export GCLOUD_PROJECT_ID="whatsapp-zoho-ticket"
+export GCLOUD_LOCATION="us-central1"
+
+gcloud config set project whatsapp-zoho-ticket
+
+gcloud auth application-default set-quota-project whatsapp-zoho-ticket
+
+start the zoho-agent service
+
+
+
+# Process to setup the whatsapp bridge, mcp server, zoho posting and other services #
+
+
+
 Env: test_rig
 IP : 192.168.82.10
 ssh root@msr@2025

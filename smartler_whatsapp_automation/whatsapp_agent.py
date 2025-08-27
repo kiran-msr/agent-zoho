@@ -38,7 +38,7 @@ def get_whatsapp_agent():
         llm="gemini/gemini-2.0-flash",
         tools=MCP(
             command="/root/.local/bin/uv",
-            args=["--directory","/usr/local/whatsapp-mcp/whatsapp-mcp-server","run","main.py"]
+            args=["--directory","/usr/local/agent-zoho/whatsapp-mcp/whatsapp-mcp-server","run","main.py"]
         ))
     return whatsapp_agent
 
@@ -119,7 +119,36 @@ def get_most_recent_message(phone_numbers: list[str], whatsapp_agent: Agent, out
     #message = outlines_llm(whatsapp_agent.start(f"get the most recent message in group(s) {numbers_string} and return it list of WhatsappChat class capture sender number also. Get the hotel_name from chat group's name"), WhatsappChatList)
     #all_message = outlines_llm(whatsapp_agent.start(f"get the last 10 message in group(s) {numbers_string} and return it list of WhatsappChat class capture sender number and timestamp of format ISO 8601 with timezone offset also. Get the hotel_name from chat group's name"), WhatsappChatList)
     #all_message = outlines_llm(whatsapp_agent.start(f"get the last 10 message in group(s) {numbers_string} and return it list of WhatsappChat class after {last_timestamp}  capture sender number and timestamp also. Get the hotel_name from chat group's name"), WhatsappChatList)
-    all_message = outlines_llm(whatsapp_agent.start(f"using configured whatsapp mcp tools get all messages in group(s) {numbers_string} and return it list of WhatsappChat class  after {last_timestamp}.  Capture sender number and timestamp also. Get the hotel_name from chat group's name. If no result found, return blank list.Don't give any example data"), WhatsappChatList)
+   # all_message = outlines_llm(whatsapp_agent.start(f"using configured whatsapp mcp tools get all messages in group(s) {numbers_string} and return it list of WhatsappChat class  after {last_timestamp}. Also capture sender number and timestamp in %Y-%m-%d %H:%M:%S format. Get the hotel_name from chat group's name. If no result found, return blank list.Don't give any example data"), WhatsappChatList)
+    all_message = outlines_llm(
+    whatsapp_agent.start(
+    f"""You are a JSON generator. 
+Do not include explanations, clarifications, or examples. 
+Respond ONLY with a valid JSON object that conforms exactly to the schema below. 
+If no messages are found, return {{"chats": []}}.
+
+using configured whatsapp mcp tools get all messages in group(s) {numbers_string} 
+and return them as a list of WhatsappChat objects after {last_timestamp}. 
+Capture sender number and timestamp in %Y-%m-%d %H:%M:%S format. 
+Get the hotel_name from the chat group's name.
+
+class WhatsappChat(BaseModel):
+    whatsapp_group_id: str
+    jid: str
+    whatsapp_group_name: str
+    issue: str
+    timestamp: str
+    roomNo: str
+    hotel_name: str
+    last_sender: str
+
+class WhatsappChatList(BaseModel):
+    chats: List[WhatsappChat]
+"""
+
+    ),
+    WhatsappChatList
+)
 
 
     print("message all ", all_message)
@@ -158,6 +187,7 @@ def test():
     #numbers = ["ITC Maurya - MSR Support","ITC Narmada Support"]
     #numbers = ["120363402296086186@g.us","120363419133063958@g.us"]
     numbers = get_list_from_env("WHATSAPP_GROUP_IDS")
+    print("numbers",numbers)
     message_object = get_most_recent_message(numbers, whatsapp_agent, outlines_llm)
    # print(from_phone_number)
    # print(message_body)
