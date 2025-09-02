@@ -14,6 +14,7 @@ credentials, _ = default(scopes=["https://www.googleapis.com/auth/cloud-platform
 credentials.refresh(google.auth.transport.requests.Request())
 
 def get_outlines_llm():
+    os.environ["GEMINI_API_KEY"] = os.getenv("GEMINI_API_KEY", "")
     """Gets the outlines language model.
 
     This function initializes and returns an outlines language model that is

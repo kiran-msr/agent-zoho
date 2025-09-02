@@ -3,12 +3,16 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 import atexit
 from pytz import timezone 
-
+from dotenv import load_dotenv
 
 from manager import execute_task
 
 app = FastAPI(title="FastAPI with Scheduler")
 
+import os
+
+load_dotenv()
+os.environ["GEMINI_API_KEY"] = os.getenv("GEMINI_API_KEY", "")
 # Initialize scheduler
 tz = timezone("Asia/Kolkata")
 scheduler = BackgroundScheduler(timezone=tz)

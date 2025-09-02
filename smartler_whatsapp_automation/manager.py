@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 from config import get_list_from_env
 from datetime import datetime
 
-print("executing task at ",datetime.now())
+print("started task at ",datetime.now())
 load_dotenv()
 
 DEPARTMENT_ID = os.environ.get("ZOHO_DEPARTMENT_ID")
@@ -59,9 +59,12 @@ def create_ticket_from_chat(chat: WhatsappChat, department_id: str) -> dict | No
         "subject": subject,
         "departmentId": department_id,
         "contactId": zoho_contact["id"],
+        "priority":"High",
+        "channel":"whatApp",
         "cf":{
-                "cf_hotel_name":hotelName,
-                "cf_room":room
+                "cf_site_name":hotelName,
+                "cf_room_no":room,
+                "cf_picklist_1":"Incident"
             }
 
     }
@@ -78,6 +81,8 @@ def create_ticket_from_chat(chat: WhatsappChat, department_id: str) -> dict | No
 
 
 def execute_task():
+    now = datetime.now()
+    print(f"---------------------------------------------- TASK EXECUTED AT {now} ------------------------------------------------------")
     whatsapp_agent = get_whatsapp_agent()
     outlines_llm = get_outlines_llm()
 
@@ -86,7 +91,8 @@ def execute_task():
     # Create tickets for each chat
     for chat in chat_list.chats:
         create_ticket_from_chat(chat, DEPARTMENT_ID)
-
+    now = datetime.now()
+    print(f"----------------------------------------------------- TASK END AT {now} --------------------------------------------------------")
 
 
 if __name__ == "__main__":

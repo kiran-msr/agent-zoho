@@ -11,3 +11,11 @@ def get_list_from_env(var_name: str) -> list[str]:
     value = os.getenv(var_name, "")
     return [item.strip() for item in value.split(",") if item.strip()]
 
+
+def get_list_from_env_with_delim(var_name: str, delimiter: str) -> list[str]:
+    """
+    Retrieve an environment variable split by the given delimiter and return as list of strings.
+    """
+    value = os.getenv(var_name, "")
+    return [item.strip() for item in value.split(delimiter) if item.strip()]
+
