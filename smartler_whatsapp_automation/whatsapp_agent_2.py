@@ -11,7 +11,8 @@ from dotenv import load_dotenv
 import os
 
 load_dotenv()
-os.environ["GEMINI_API_KEY"] = os.getenv("GEMINI_API_KEY", "")
+gemini_api_key=os.getenv("GEMINI_API_KEY", "")
+os.environ["GEMINI_API_KEY"] = gemini_api_key
 # -------------------------------
 # Models
 # -------------------------------
@@ -41,7 +42,7 @@ class WhatsappChatList(BaseModel):
 # Agent setup
 # -------------------------------
 def get_whatsapp_agent():
-    os.environ["GEMINI_API_KEY"] = os.getenv("GEMINI_API_KEY", "")
+    os.environ["GEMINI_API_KEY"] = gemini_api_key
     """Initialize the WhatsApp agent with MCP server."""
     whatsapp_agent = Agent(
         instructions="Whatsapp Agent",
@@ -166,9 +167,12 @@ Raw MCP data:
     # 3) Parse & normalize
     message_object = WhatsappChatList.model_validate_json(structured_response)
 
+    print("message object after parse ",message_object)
     # Filter out old chats
     message_object = filter_chats_after_timestamp(message_object, last_timestamp)
 
+    print("message object after filter ",message_object)
+    
     last_msg_time = None
     for group_chat in message_object.chats :
     #print("group_chat ",group_chat)

@@ -6,7 +6,7 @@ import google.auth.transport.requests
 import openai
 
 load_dotenv()
-
+gemini_api_key=os.getenv("GEMINI_API_KEY", "")
 GCLOUD_PROJECT_ID = os.environ.get("GCLOUD_PROJECT_ID")
 GCLOUD_LOCATION = os.environ.get("GCLOUD_LOCATION")
 
@@ -14,7 +14,7 @@ credentials, _ = default(scopes=["https://www.googleapis.com/auth/cloud-platform
 credentials.refresh(google.auth.transport.requests.Request())
 
 def get_outlines_llm():
-    os.environ["GEMINI_API_KEY"] = os.getenv("GEMINI_API_KEY", "")
+    os.environ["GEMINI_API_KEY"] = gemini_api_key
     """Gets the outlines language model.
 
     This function initializes and returns an outlines language model that is

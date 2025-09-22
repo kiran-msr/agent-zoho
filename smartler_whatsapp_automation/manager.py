@@ -88,6 +88,7 @@ def execute_task():
 
     chat_list = get_most_recent_message(numbers, whatsapp_agent, outlines_llm)
 
+    print(" chats going to post ",chat_list)
     # Create tickets for each chat
     for chat in chat_list.chats:
         create_ticket_from_chat(chat, DEPARTMENT_ID)
