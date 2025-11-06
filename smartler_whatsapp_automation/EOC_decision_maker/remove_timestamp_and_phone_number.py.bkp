@@ -1,0 +1,70 @@
+import re
+import json
+from pathlib import Path
+
+MAPPING_FILE = Path("phone_user_map.json")
+
+
+def load_mapping():
+    """Load mapping from JSON, ensure dict."""
+    if MAPPING_FILE.exists():
+        try:
+            with open(MAPPING_FILE, "r") as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    return data
+        except json.JSONDecodeError:
+            pass
+    return {}
+
+
+def save_mapping(mapping):
+    with open(MAPPING_FILE, "w") as f:
+        json.dump(mapping, f, indent=2)
+
+
+def remove_time_and_contact_info(chat_text):
+    """
+    Convert:
+      [time] +91 82207 64820: message
+    to:
+      user-64820: message
+    """
+    mapping = load_mapping()
+
+    pattern = re.compile(
+        r"\[\d{1,2}:\d{2}\s*(?:am|pm)?,\s*\d{2}/\d{2}/\d{4}\]\s*(\+?\d[\d\s-]+\d):\s*(.*)"
+    )
+
+    processed = []
+    for line in chat_text.strip().splitlines():
+        m = pattern.match(line)
+        if m:
+            phone_raw, message = m.groups()
+            # Remove non-digits and get last 5 digits
+            phone_digits = re.sub(r"\D", "", phone_raw)
+            user_id = f"user-{phone_digits[-5:]}"
+            # Store mapping for reference
+            if phone_digits not in mapping:
+                mapping[phone_digits] = user_id
+            processed.append(f"{mapping[phone_digits]}: {message}")
+        else:
+            processed.append(line)
+
+    save_mapping(mapping)
+    return "\n".join(processed)
+
+
+if __name__ == "__main__":
+    sample_text = """[1:38 pm, 02/09/2025] +91 82207 64820: @~Sakthi check
+[1:38 pm, 02/09/2025] +91 63854 32005: Noted
+[1:45 pm, 02/09/2025] +91 87545 96576: 4306 vip room to check
+[1:49 pm, 02/09/2025] +91 63854 32005: No issues found.
+[1:51 pm, 02/09/2025] +91 87545 96576: 4101 vip room to check
+[1:54 pm, 02/09/2025] +91 87545 96576: 4306 4101 3512 3515 vip room to check
+[3:11 pm, 02/09/2025] +91 87545 96576: 3608 3601 vip room to check
+[3:11 pm, 02/09/2025] +91 7397 570 700: 3727 iPad not working
+[3:12 pm, 02/09/2025] +91 7397 570 700: Kenfix room please check
+[3:12 pm, 02/09/2025] +91 98404 37797: Noted will check"""
+    print(remove_time_and_contact_info(sample_text))
+

@@ -10,10 +10,9 @@ from config import get_list_from_env_with_delim
 from dotenv import load_dotenv
 import os
 
-
-
 load_dotenv()
-os.environ["GEMINI_API_KEY"] = os.getenv("GEMINI_API_KEY", "")
+gemini_api_key=os.getenv("GEMINI_API_KEY", "")
+os.environ["GEMINI_API_KEY"] = gemini_api_key
 # -------------------------------
 # Models
 # -------------------------------
@@ -43,7 +42,7 @@ class WhatsappChatList(BaseModel):
 # Agent setup
 # -------------------------------
 def get_whatsapp_agent():
-    os.environ["GEMINI_API_KEY"] = os.getenv("GEMINI_API_KEY", "")
+    os.environ["GEMINI_API_KEY"] = gemini_api_key
     """Initialize the WhatsApp agent with MCP server."""
     whatsapp_agent = Agent(
         instructions="Whatsapp Agent",
@@ -59,35 +58,6 @@ def get_whatsapp_agent():
         )
     )
     return whatsapp_agent
-
-
-
-def get_util_agent():
-    gemini_agent = Agent(
-    instructions="""
-    You are a WhatsApp message organizer.
-    
-    Your tasks:
-    1. Process messages from multiple WhatsApp groups.
-    2. For each WhatsApp group:
-       - Group the messages by sender. sender will be the phone number who send the message in the whatsapp group
-       - Within each sender group, sort the messages in chronological order.
-    3. Keep groups separate (do not mix messages from different groups).
-    4. Return the result in a clear, structured format.
-
-    Group: <Group Name>
-        Sender: <Sender 1>
-            - <Message 1>
-            - <Message 2>
-        Sender: <Sender 2>
-            - <Message 1>
-            - <Message 2>
-    """,
-    llm="gemini/gemini-2.0-flash"
-    )
-
-    return gemini_agent;
-
 
 
 # -------------------------------
@@ -133,12 +103,11 @@ def get_most_recent_message(phone_numbers: list[str], whatsapp_agent: Agent, out
     )
     print("✅ MCP server raw response:", raw_response)
 
-
-    whatsapp_organizer = get_util_agent();
-    raw_response = whatsapp_organizer.start(
-            f"Raw messages: {raw_response} "
+    print(f"📡 Calling MCP server for groups {numbers_string} after {last_timestamp}")
+    raw_response = whatsapp_agent.start(
+            f"group the messages based on sender and order the messages of each sender in ascending time order .Raw messages: {raw_response} "
     )
-    print("✅  response after grouping:", raw_response)
+    print("✅ MCP server raw response:", raw_response)
 
     #raw_response = whatsapp_agent.start(
     #        f"filter out all the messages before {last_timestamp} .Raw messages: {raw_response} "
@@ -198,9 +167,12 @@ Raw MCP data:
     # 3) Parse & normalize
     message_object = WhatsappChatList.model_validate_json(structured_response)
 
+    print("message object after parse ",message_object)
     # Filter out old chats
     message_object = filter_chats_after_timestamp(message_object, last_timestamp)
 
+    print("message object after filter ",message_object)
+    
     last_msg_time = None
     for group_chat in message_object.chats :
     #print("group_chat ",group_chat)
@@ -241,5 +213,5 @@ def test2():
     get_whatsapp_group_info(whatsapp_agent,group_names)
 
 if __name__ == "__main__":
-    test()
+    test2()
 

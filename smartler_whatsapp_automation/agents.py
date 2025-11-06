@@ -10,8 +10,6 @@ from config import get_list_from_env_with_delim
 from dotenv import load_dotenv
 import os
 
-
-
 load_dotenv()
 os.environ["GEMINI_API_KEY"] = os.getenv("GEMINI_API_KEY", "")
 # -------------------------------
@@ -59,9 +57,9 @@ def get_whatsapp_agent():
         )
     )
     return whatsapp_agent
-
-
-
+#-------------------------------
+# Agents
+# -----------------------------
 def get_util_agent():
     gemini_agent = Agent(
     instructions="""
@@ -88,6 +86,84 @@ def get_util_agent():
 
     return gemini_agent;
 
+def get_group_segregation_agent():
+    gemini_agent = Agent(
+    instructions="""
+    You are a WhatsApp message organizer.
+    
+    Your tasks:
+    1. Process messages from multiple WhatsApp groups.
+    2. For each WhatsApp group:
+       - Group the messages by sender. sender will be the phone number who send the message in the whatsapp group
+       - Within each sender group, sort the messages in chronological order.
+    3. Keep groups separate (do not mix messages from different groups).
+    4. Return the result in a clear, structured format.
+
+    Group: <Group Name>
+        Sender: <Sender 1>
+            - <Message 1>
+            - <Message 2>
+        Sender: <Sender 2>
+            - <Message 1>
+            - <Message 2>
+    """,
+    llm="gemini/gemini-2.0-flash"
+    )
+
+    return gemini_agent;
+
+def get_chat_sanitizer_agent():
+    gemini_agent = Agent(
+    instructions="""
+    You are a WhatsApp message organizer.
+
+    Your tasks:
+    1. Process messages from multiple WhatsApp groups.
+    2. For each WhatsApp group:
+       - Group the messages by sender. sender will be the phone number who send the message in the whatsapp group
+       - Within each sender group, sort the messages in chronological order.
+    3. Keep groups separate (do not mix messages from different groups).
+    4. Return the result in a clear, structured format.
+
+    Group: <Group Name>
+        Sender: <Sender 1>
+            - <Message 1>
+            - <Message 2>
+        Sender: <Sender 2>
+            - <Message 1>
+            - <Message 2>
+    """,
+    llm="gemini/gemini-2.0-flash"
+    )
+
+    return gemini_agent;
+
+
+def get_issue_extractor_agent():
+    gemini_agent = Agent(
+    instructions="""
+    You are a WhatsApp message organizer.
+    
+    Your tasks:
+    1. Process messages from multiple WhatsApp groups.
+    2. For each WhatsApp group:
+       - Group the messages by sender. sender will be the phone number who send the message in the whatsapp group
+       - Within each sender group, sort the messages in chronological order.
+    3. Keep groups separate (do not mix messages from different groups).
+    4. Return the result in a clear, structured format.
+
+    Group: <Group Name>
+        Sender: <Sender 1>
+            - <Message 1>
+            - <Message 2>
+        Sender: <Sender 2>
+            - <Message 1>
+            - <Message 2>
+    """,
+    llm="gemini/gemini-2.0-flash"
+    )
+
+    return gemini_agent;
 
 
 # -------------------------------
@@ -242,4 +318,5 @@ def test2():
 
 if __name__ == "__main__":
     test()
+
 

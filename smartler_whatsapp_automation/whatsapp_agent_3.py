@@ -9,8 +9,12 @@ from config import get_list_from_env
 from config import get_list_from_env_with_delim
 from dotenv import load_dotenv
 import os
+import json
+import pytz
 
 
+from EOC_decision_maker.run_conversation_end_decision_maker import run_eoc_decision_maker
+from EOC_decision_maker.message_store import save_group_messages,get_groupwise_messages
 
 load_dotenv()
 os.environ["GEMINI_API_KEY"] = os.getenv("GEMINI_API_KEY", "")
@@ -39,6 +43,14 @@ class WhatsappChatList(BaseModel):
     chats: List[WhatsappChat]
 
 
+class GroupMessage(BaseModel):
+    groupName: str
+    messages: str
+
+
+class GroupMessageList(BaseModel):
+    groups: List[GroupMessage]
+
 # -------------------------------
 # Agent setup
 # -------------------------------
@@ -46,7 +58,8 @@ def get_whatsapp_agent():
     os.environ["GEMINI_API_KEY"] = os.getenv("GEMINI_API_KEY", "")
     """Initialize the WhatsApp agent with MCP server."""
     whatsapp_agent = Agent(
-        instructions="Whatsapp Agent",
+        instructions="""Whatsapp Agent.
+        NOTE: give response with the sender details of each message in each group""",
         llm="gemini/gemini-2.0-flash",
         tools=MCP(
             command="/root/.local/bin/uv",
@@ -75,18 +88,62 @@ def get_util_agent():
     3. Keep groups separate (do not mix messages from different groups).
     4. Return the result in a clear, structured format.
 
-    Group: <Group Name>
-        Sender: <Sender 1>
+    Group: <Group Name 1>
             - <Message 1>
             - <Message 2>
-        Sender: <Sender 2>
+            - <Message 3>
+            - <Message 4>
+
+    Group: <Group Name 2>
             - <Message 1>
             - <Message 2>
+            - <Message 3>
+            - <Message 4>
     """,
     llm="gemini/gemini-2.0-flash"
     )
 
     return gemini_agent;
+
+
+def get_format_agent():
+    gemini_agent = Agent(
+    instructions="""
+    You are an expert in format a text with desired format.
+    
+    Your tasks:
+    1. Process messages from multiple WhatsApp groups.
+    2. For each WhatsApp group:
+       - format the each message in below mention format.
+           [H:mm AM, dd/MM/yyyy ] <phone_number>: <message>
+    3. Keep groups separate (do not mix messages from different groups).
+    4. Return the result in a clear, structured json only, no other explanation or note or any kind of extra text
+
+    [
+    {
+      "groupName":"<GROUP_NAME_1>",
+      "messages":"
+      [H:mm AM, dd/MM/yyyy ] <phone_number>: <message>
+      [H:mm AM, dd/MM/yyyy ] <phone_number>: <message>
+      [H:mm AM, dd/MM/yyyy ] <phone_number>: <message>
+      "
+    },
+    {
+      "groupName":"<GROUP_NAME_1>",
+      "messages":"
+      [H:mm AM, dd/MM/yyyy ] <phone_number>: <message>
+      [H:mm AM, dd/MM/yyyy ] <phone_number>: <message>
+      [H:mm AM, dd/MM/yyyy ] <phone_number>: <message>
+      "
+    }
+    ]
+        
+    """,
+    llm="gemini/gemini-2.0-flash"
+    )
+
+    return gemini_agent;
+
 
 
 
@@ -97,7 +154,29 @@ def join_string(data: list[str]) -> str:
     return ", ".join(data) if data else ""
 
 
+
 def filter_chats_after_timestamp(chats: WhatsappChatList, input_dt: datetime) -> WhatsappChatList:
+    """Keep only chats with timestamp after given datetime, fixing timezone info."""
+    filtered = []
+    kolkata_tz = pytz.timezone("Asia/Kolkata")
+
+    for chat in chats.chats:
+        try:
+            # Replace UTC tzinfo with Asia/Kolkata without changing the numeric time
+            chat_time_fixed = chat.timestamp.replace(tzinfo=kolkata_tz)
+
+            if chat_time_fixed > input_dt:
+                print("chat time ", chat_time_fixed, " ref time ", input_dt)
+                filtered.append(chat)
+        except Exception as e:
+            print("⚠️ Skipping chat due to timestamp parse error:", e)
+            continue
+
+    return WhatsappChatList(chats=filtered)
+
+
+
+def filter_chats_after_timestamp_2(chats: WhatsappChatList, input_dt: datetime) -> WhatsappChatList:
     """Keep only chats with timestamp after given datetime."""
     filtered = []
     for chat in chats.chats:
@@ -129,17 +208,63 @@ def get_most_recent_message(phone_numbers: list[str], whatsapp_agent: Agent, out
     # 1) Call MCP tool explicitly (just fetch raw messages)
     print(f"📡 Calling MCP server for groups {numbers_string} after {last_timestamp}")
     raw_response = whatsapp_agent.start(
-        f"get all messages in group(s) {numbers_string} after {last_timestamp} along with group name"
+        f"get all messages in group(s) {numbers_string} after {last_timestamp} along with group name and with sender whatsapp-number"
     )
     print("✅ MCP server raw response:", raw_response)
 
 
     whatsapp_organizer = get_util_agent();
-    raw_response = whatsapp_organizer.start(
+    raw_response_2 = whatsapp_organizer.start(
             f"Raw messages: {raw_response} "
     )
-    print("✅  response after grouping:", raw_response)
+    print("✅  response after grouping:", raw_response_2)
 
+    
+
+    whatsapp_message_formatter = get_format_agent();
+    raw_response_2 = whatsapp_message_formatter.start(
+            f"Raw messages: {raw_response_2} "
+    )
+    print("✅  response after formatting:", raw_response_2)
+
+
+    additonal_response = outlines_llm(
+        f"""You are a JSON generator.
+Respond ONLY with valid JSON conforming exactly to the schema below.
+Do not include explanations, clarifications, or examples.
+If no messages with actionable issues are found, return [].
+
+Goal:
+extract the group name and the message
+
+
+
+class GroupMessage(BaseModel):
+    groupName: str
+    messages: str
+
+
+class GroupMessageList(BaseModel):
+    groups: List[GroupMessage]
+
+Raw MCP data:
+{raw_response_2}
+
+""",
+       GroupMessageList
+    )
+
+    print("✅  additonal_response :", additonal_response)
+
+    parsed = json.loads(additonal_response)
+    save_group_messages(parsed)
+
+    eoc_chat_info = build_group_responses(additonal_response)
+
+    print("✅  EOC CHAT INFO :", eoc_chat_info)
+    
+    previous_message = get_groupwise_messages()
+    
     #raw_response = whatsapp_agent.start(
     #        f"filter out all the messages before {last_timestamp} .Raw messages: {raw_response} "
     #)
@@ -150,6 +275,54 @@ def get_most_recent_message(phone_numbers: list[str], whatsapp_agent: Agent, out
         return WhatsappChatList(chats=[])
 
     # 2) Structure with Outlines LLM (now carries extraction instructions)
+
+    print("=========================================  QUERY TO ISSUE MAKER AI AGENT ============================================")
+    print(f"""You are a JSON generator.
+Respond ONLY with valid JSON conforming exactly to the schema below.
+Do not include explanations, clarifications, or examples.
+If no messages with actionable issues are found, return {{"chats": []}}.
+
+Goal:
+Analyze the Raw MCP data (below) and extract reported operational issues per room per WhatsApp group.
+Each output object must represent one consolidated issue for a specific room in a specific group.
+
+Rules (follow exactly):
+1) hotel_name: extract from whatsapp_group_name — use the substring before the first " - ", "|" or ":"; if none, use the full group name. ignore word "MSR", "Support" if present. 
+2) roomNo: detect explicit room numbers from message text using patterns like "room 5262", "rm 5262", "roomNo: 438", "room#438" or standalone 2-5 digit sequences that appear near the word "room", "rm", "roomno", or "guest". If no reliable room number is found, set roomNo to "". If there are multiple occurance of room numbers in single message, break it into separate individual message for each room with same mentioned issue or context.
+3) Aggregation: if multiple messages refer to the same problem for the same room in the same group, MERGE them into one WhatsappChat object. The merged "issue" must be a single concise sentence (no quotes), summarizing the problem or request (max 30 words). Keep only the core actionable symptom or request; omit greetings and filler.
+4) timestamp: use the timestamp of the LATEST message included in the aggregated issue.Output it as a string formatted exactly "%Y-%m-%d %H:%M:%S" (no timezone suffix)(e.g. 2025-01-05 13:42:25) . If parsing/conversion fails, set timestamp to "". All timestamp in chats are in Asia/Kolkata timezone , no need to covert timezones.
+5) last_sender: telephone number of the sender of the latest message in the aggregated issue. If unavailable, use "".
+6) whatsapp_group_id and jid: set both to the group's JID as present in raw data. whatsapp_group_name: use the raw group name.
+7) issue filtering: ignore irrelevant messages (greetings, acknowledgements, emojis, "ok", "thanks", chit-chat, repeated confirmations). Only extract actionable problem descriptions or requests. System/admin messages should only be used if they contain actual issue text.
+8) Multiple distinct issues or different room numbers => produce separate WhatsappChat entries.
+9) Output must strictly match the schema below. Do not add, rename, or remove fields. Use empty strings ("") for missing textual fields and return an empty list ({{"chats": []}}) when no issues found.
+10) Conservative behavior: if you cannot confidently identify a room or an actionable issue from messages, skip that message.
+
+Schema:
+class WhatsappChat(BaseModel):
+    whatsapp_group_id: str
+    jid: str
+    whatsapp_group_name: str
+    issue: str
+    timestamp: str
+    roomNo: str
+    hotel_name: str
+    last_sender: str
+
+class WhatsappChatList(BaseModel):
+    chats: List[WhatsappChat]
+
+{previous_message}
+
+extract the issue based on only the raw chat response mentioned below. To extract the issue more accurately from below raw response consider the previous meesage if mentioned above. But dont create issue direct from previous message.
+Raw chat information
+
+{eoc_chat_info}
+
+""")
+
+
+
     structured_response = outlines_llm(
         f"""You are a JSON generator.
 Respond ONLY with valid JSON conforming exactly to the schema below.
@@ -186,8 +359,11 @@ class WhatsappChat(BaseModel):
 class WhatsappChatList(BaseModel):
     chats: List[WhatsappChat]
 
-Raw MCP data:
-{raw_response}
+{previous_message}
+
+Raw chat information
+
+{eoc_chat_info}
 
 """,
         WhatsappChatList
@@ -221,6 +397,33 @@ Raw MCP data:
     #normalized_chats = [WhatsappChat(**chat.normalized()) for chat in message_object.chats]
     #return WhatsappChatList(chats=normalized_chats)
     return message_object
+
+
+def build_group_responses(group_list: GroupMessageList) -> str:
+    """
+    Iterate through all groups, process each messages string,
+    and combine into a single output.
+    """
+
+    if isinstance(group_list, str):
+        import json
+        group_list = GroupMessageList(**json.loads(group_list))
+    elif isinstance(group_list, dict):
+        group_list = GroupMessageList(**group_list)
+    all_responses: List[str] = []
+
+    print("-------------------0 group_list ", group_list.groups)
+    for group in group_list.groups:
+        print("-------------------------1 ",group)
+        response = run_eoc_decision_maker(group.messages)
+        # Concatenate group name + 2 blank lines + response
+        combined = f"{group.groupName}\n\n{response}"
+        all_responses.append(combined)
+
+    # Join all groups' results into one string separated by two newlines
+    return "\n\n".join(all_responses)
+
+
 
 # -------------------------------
 # Test runner
