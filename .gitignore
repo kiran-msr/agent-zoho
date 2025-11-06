@@ -1,0 +1,7 @@
+# Ignore environment files
+smartler_whatsapp_automation/.env
+smartler_whatsapp_automation/.env.swp
+
+# Ignore timestamp file
+smartler_whatsapp_automation/timestamp.txt
+
